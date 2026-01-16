@@ -1,9 +1,14 @@
 ---
 title: "Physical Activity and Mental Health Across Adulthood"
-author: Arad Mishkal
+author: "Arad Mishkal"
 output:
   html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: false
+    theme: readable
     df_print: paged
+    self_contained: true
 ---
 
 ## Introduction
