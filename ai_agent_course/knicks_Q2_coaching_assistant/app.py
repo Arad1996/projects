@@ -14,29 +14,32 @@ load_dotenv(override=True)
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
 DB_PATH = APP_DIR / "knicks_coach.db"
+MODEL = "gpt-4o-mini"
 
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-pushover_user = os.getenv("PUSHOVER_USER")
-pushover_token = os.getenv("PUSHOVER_TOKEN")
-pushover_url = "https://api.pushover.net/1/messages.json"
+PUSHOVER_USER = os.getenv("PUSHOVER_USER")
+PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
 
-def push(message):
+def push(message: str) -> None:
     print(f"Push: {message}", flush=True)
-    if not pushover_user or not pushover_token:
+    if not PUSHOVER_USER or not PUSHOVER_TOKEN:
         print("Pushover credentials not set; skipping notification.", flush=True)
         return
-    payload = {"user": pushover_user, "token": pushover_token, "message": message}
-    requests.post(pushover_url, data=payload, timeout=10)
+    requests.post(
+        "https://api.pushover.net/1/messages.json",
+        data={"user": PUSHOVER_USER, "token": PUSHOVER_TOKEN, "message": message},
+        timeout=10,
+    )
 
 
-def record_unknown_question(question):
+def record_unknown_question(question: str) -> dict:
     push(f"Unknown basketball question:\n{question}")
     return {"recorded": "ok"}
 
 
-def _clean_columns(df):
+def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [
         c.strip().lower()
         .replace(" ", "_")
@@ -50,17 +53,15 @@ def _clean_columns(df):
     return df
 
 
-def create_database():
+def create_database() -> None:
     conn = sqlite3.connect(DB_PATH)
-
-    traditional_df = _clean_columns(pd.read_csv(DATA_DIR / "traditional_stats_q1.csv"))
-    advanced_df = _clean_columns(pd.read_csv(DATA_DIR / "advanced_stats_q1.csv"))
-    matchups_df = _clean_columns(pd.read_csv(DATA_DIR / "prev_matchups.csv"))
-
-    traditional_df.to_sql("traditional_stats", conn, if_exists="replace", index=False)
-    advanced_df.to_sql("advanced_stats", conn, if_exists="replace", index=False)
-    matchups_df.to_sql("matchups", conn, if_exists="replace", index=False)
-
+    for table, csv_name in (
+        ("traditional_stats", "traditional_stats_q1.csv"),
+        ("advanced_stats", "advanced_stats_q1.csv"),
+        ("matchups", "prev_matchups.csv"),
+    ):
+        df = _clean_columns(pd.read_csv(DATA_DIR / csv_name))
+        df.to_sql(table, conn, if_exists="replace", index=False)
     conn.commit()
     conn.close()
     print("Database created successfully", flush=True)
@@ -70,108 +71,119 @@ if not DB_PATH.exists():
     create_database()
 
 
-def get_connection():
-    return sqlite3.connect(DB_PATH)
+def _fetch_table(table: str, result_key: str) -> dict:
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        df = pd.read_sql_query(f"SELECT * FROM {table}", conn)
+    finally:
+        conn.close()
+    return {result_key: df.to_dict("records")}
 
 
-def get_game_context():
-    conn = get_connection()
+def get_traditional_stats_q1() -> dict:
+    return _fetch_table("traditional_stats", "traditional_stats")
 
-    traditional = pd.read_sql_query("SELECT * FROM traditional_stats", conn)
-    advanced = pd.read_sql_query("SELECT * FROM advanced_stats", conn)
-    matchups = pd.read_sql_query("SELECT * FROM matchups", conn)
 
-    conn.close()
+def get_advanced_stats_q1() -> dict:
+    return _fetch_table("advanced_stats", "advanced_stats")
 
+
+def get_matchup_history() -> dict:
+    return _fetch_table("matchups", "matchups")
+
+
+def _tool_schema(name: str, description: str, *, properties=None, required=None) -> dict:
     return {
-        "traditional_stats": traditional.to_dict("records"),
-        "advanced_stats": advanced.to_dict("records"),
-        "matchups": matchups.to_dict("records"),
+        "name": name,
+        "description": description.strip(),
+        "parameters": {
+            "type": "object",
+            "properties": properties or {},
+            "required": required or [],
+            "additionalProperties": False,
+        },
     }
 
 
-record_unknown_question_json = {
-    "name": "record_unknown_question",
-    "description": """
-    Use this tool whenever a question
-    cannot be answered using the
-    available statistics and matchup data.
-    """,
-    "parameters": {
-        "type": "object",
-        "properties": {"question": {"type": "string"}},
-        "required": ["question"],
-        "additionalProperties": False,
-    },
-}
-
-get_game_context_json = {
-    "name": "get_game_context",
-    "description": """
-    Retrieve all available game information.
-
-    Includes:
-    - Q1 traditional stats
-    - Q1 advanced stats
-    - historical matchup data
-
-    Use this information to recommend
-    lineups and strategies for the
-    beginning of Q2.
-    """,
-    "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": False,
-    },
-}
-
 tools = [
-    {"type": "function", "function": get_game_context_json},
-    {"type": "function", "function": record_unknown_question_json},
+    {
+        "type": "function",
+        "function": _tool_schema(
+            "get_traditional_stats_q1",
+            """
+            Q1 traditional box-score stats per Knicks player.
+            Use for lineup, rotation, scoring, and foul-trouble questions.
+            """,
+        ),
+    },
+    {
+        "type": "function",
+        "function": _tool_schema(
+            "get_advanced_stats_q1",
+            """
+            Q1 advanced metrics: ratings, usage, rebound rates, efficiency.
+            Use for impact, spacing, and two-way fit questions.
+            """,
+        ),
+    },
+    {
+        "type": "function",
+        "function": _tool_schema(
+            "get_matchup_history",
+            """
+            Historical head-to-head matchup data for Knicks players vs opponents.
+            Use for matchup and defensive assignment questions.
+            """,
+        ),
+    },
+    {
+        "type": "function",
+        "function": _tool_schema(
+            "record_unknown_question",
+            "Use when the question cannot be answered from available stats or matchups.",
+            properties={"question": {"type": "string"}},
+            required=["question"],
+        ),
+    },
 ]
 
 system_prompt = """
 You are an NBA assistant coach for the New York Knicks.
 
-Your job is to help the coaching staff
-make decisions for the beginning of Q2.
+Your job is to help the coaching staff make decisions for the beginning of Q2.
 
-You have access to:
+You work like a real assistant coach: investigate the situation with data
+before recommending lineups or strategy. Do not answer from memory or guess.
 
-1. Traditional Q1 player statistics
-2. Advanced Q1 player statistics
-3. Historical matchup data
+Available tools:
+- get_traditional_stats_q1 — Q1 box-score stats
+- get_advanced_stats_q1 — Q1 advanced impact metrics
+- get_matchup_history — historical player matchup data
+- record_unknown_question — when the data cannot answer the question
 
-When you need data,
-use the get_game_context tool.
+Follow this process for every coaching question:
 
-Your responsibilities include:
+1. Understand the coaching question (lineup, matchup, offense, defense, rotation, etc.).
+2. Decide what evidence you need, then call the appropriate tool(s).
+3. Analyze the returned data before recommending anything.
+4. If you still lack evidence, call another tool before answering.
+5. Make a clear Q2 coaching recommendation.
+6. Explain your reasoning with specific numbers and player names from the data.
 
-- Recommending the best lineup for Q2
-- Identifying favorable matchups
-- Suggesting offensive adjustments
-- Suggesting defensive adjustments
-- Recommending player substitutions
-- Answering questions about the game
+You may call multiple tools in sequence across several turns. Gather evidence first;
+only give your final recommendation once you have enough data to support it.
 
-Always support your recommendations
-with data from the tool.
-
-If a question cannot be answered
-using the available Q1 statistics,
-advanced statistics,
-or matchup information,
-use the record_unknown_question tool.
-
-Do not invent data.
-Do not guess.
-If you don't find the player name in the data, use the record_unknown_question tool.
+Rules:
+- Do not invent statistics or player names.
+- Cite the data that supports each recommendation.
+- If a player is not in the tool results, or the question needs data you do not have,
+  call record_unknown_question with the user's question, then explain what is missing.
 """
 
 TOOLS_MAP = {
-    "get_game_context": get_game_context,
+    "get_traditional_stats_q1": get_traditional_stats_q1,
+    "get_advanced_stats_q1": get_advanced_stats_q1,
+    "get_matchup_history": get_matchup_history,
     "record_unknown_question": record_unknown_question,
 }
 
@@ -179,43 +191,40 @@ TOOLS_MAP = {
 def handle_tool_calls(tool_calls):
     results = []
     for tool_call in tool_calls:
-        tool_name = tool_call.function.name
-        arguments = json.loads(tool_call.function.arguments)
-        print(f"Tool called: {tool_name}", flush=True)
-        tool = TOOLS_MAP.get(tool_name)
-        result = tool(**arguments) if tool else {}
+        name = tool_call.function.name
+        args = json.loads(tool_call.function.arguments)
+        print(f"Tool called: {name}", flush=True)
+        fn = TOOLS_MAP.get(name)
         results.append(
             {
                 "role": "tool",
-                "content": json.dumps(result),
+                "content": json.dumps(fn(**args) if fn else {}),
                 "tool_call_id": tool_call.id,
             }
         )
     return results
 
 
+def run_agent_loop(messages):
+    while True:
+        response = openai.chat.completions.create(
+            model=MODEL, messages=messages, tools=tools
+        )
+        if response.choices[0].finish_reason == "tool_calls":
+            message = response.choices[0].message
+            messages.append(message)
+            messages.extend(handle_tool_calls(message.tool_calls))
+        else:
+            return messages
+
+
 def chat(message, history):
     messages = [{"role": "system", "content": system_prompt}] + history + [
         {"role": "user", "content": message}
     ]
+    messages = run_agent_loop(messages)
 
-    while True:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini", messages=messages, tools=tools
-        )
-        finish_reason = response.choices[0].finish_reason
-
-        if finish_reason == "tool_calls":
-            assistant_message = response.choices[0].message
-            results = handle_tool_calls(assistant_message.tool_calls)
-            messages.append(assistant_message)
-            messages.extend(results)
-        else:
-            break
-
-    stream = openai.chat.completions.create(
-        model="gpt-4o-mini", messages=messages, stream=True
-    )
+    stream = openai.chat.completions.create(model=MODEL, messages=messages, stream=True)
     result = ""
     for chunk in stream:
         result += chunk.choices[0].delta.content or ""
@@ -227,19 +236,12 @@ demo = gr.ChatInterface(
     type="messages",
     title="🏀 Knicks Q2 Coaching Assistant",
     description="""
-    AI assistant for lineup and strategy decisions.
+    AI assistant coach for Q2 lineup and strategy decisions.
 
-    Uses:
-    • Q1 Traditional Stats
-    • Q1 Advanced Stats
-    • Historical Matchups
+    Investigates with tools before recommending:
+    • Q1 traditional stats • Q1 advanced metrics • Historical matchups
 
-    Ask questions about:
-    • Best Q2 lineup
-    • Matchup advantages
-    • Offensive strategy
-    • Defensive adjustments
-    • Player rotations
+    Ask about lineups, matchups, offense, defense, or rotations.
     """,
 )
 
