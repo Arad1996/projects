@@ -5,7 +5,9 @@ sdk: gradio
 sdk_version: 5.49.1
 ---
 
-# Knicks Q2 Coaching Assistant
+# Knicks Q2 Coaching Assistant 
+
+# Try it out! https://huggingface.co/spaces/Aradm1996/knicks_q2_coach
 
 AI assistant for New York Knicks lineup and strategy decisions at the start of Q2.
 
