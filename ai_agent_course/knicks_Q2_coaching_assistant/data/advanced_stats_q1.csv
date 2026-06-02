@@ -1,0 +1,10 @@
+PLAYER,Minutes Played,Offensive Rating (points scored per 100 possessions while on court),Defensive Rating (points allowed per 100 possessions while on court),Net Rating (Offensive Rating − Defensive Rating),Assist Percentage (% of teammates' baskets the player assisted while on court),Assist-to-Turnover Ratio,Assists per 100 possessions,Offensive Rebound Percentage,Defensive Rebound Percentage,Total Rebound Percentage,Turnover Ratio (turnovers per 100 possessions),Effective Field Goal Percentage (adjusts for extra value of 3-pointers),"True Shooting Percentage (accounts for field goals, 3-pointers, and free throws)",Usage Rate (% of team possessions finished by the player),Estimated possessions per 48 minutes,Player Impact Estimate (overall contribution to the game)
+Josh HartF,10:31,163.6,95.7,68,30.8,4,57.1,9.1,13.3,11.5,14.3,75,75,11.1,102.69,10.2
+OG AnunobyF,07:27,143.8,100,43.8,25,0,40,0,11.1,5.9,0,33.3,33.3,15.8,106.31,4.4
+Karl-Anthony TownsC,08:56,138.9,110.5,28.4,14.3,0,20,11.1,55.6,33.3,0,100,100,19,99.4,26.8
+Mikal BridgesG,08:56,138.9,110.5,28.4,12.5,0,14.3,0,0,0,0,40,51,28.6,99.4,6.2
+Jalen BrunsonG,12:00,158.3,104,54.3,33.3,0,36.4,0,6.7,3.7,0,50,50,24.1,98,11.9
+Mitchell Robinson,04:33,187.5,100,87.5,0,0,0,50,33.3,40,0,75,75,40,89.67,37.2
+Miles McBride,04:33,187.5,100,87.5,0,0,0,0,0,0,0,150,150,10,89.67,14
+Landry Shamet,03:04,216.7,83.3,133.3,0,0,0,0,0,0,0,150,150,12.5,93.91,16.2
+TOTALS,,158.3,104,54.3,80,12,29.3,41.7,73.3,59.3,4.2,66.7,68.1,100,98,69.4
