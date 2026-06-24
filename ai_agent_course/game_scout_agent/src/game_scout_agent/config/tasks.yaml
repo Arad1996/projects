@@ -1,0 +1,58 @@
+news_research_task:
+  description: >
+    You MUST use the search tool to find real, up-to-date NBA news.
+
+    Matchup: {matchup}
+
+    Search specifically for:
+    - TODAY injury reports
+    - player availability updates
+    - starting lineups
+    - last 24–72 hours NBA news
+    - coach press conferences
+    - official team injury reports
+
+    Do NOT rely on memory or general knowledge.
+    Only use current search results.
+
+  expected_output: >
+    A bullet-point summary of ONLY recent verified news (last 3 days).
+  agent: news_researcher
+
+
+stats_analysis_task:
+  description: >
+    Analyze the matchup: {matchup}.
+
+    Focus on:
+    - Team strengths
+    - Team weaknesses
+    - Key player statistics
+    - Recent trends
+    - Important matchup advantages
+
+  expected_output: >
+    A statistical analysis of the matchup including key trends and players to watch.
+
+  agent: stats_analyst
+
+
+game_scout_report_task:
+  description: >
+    Using the news research and statistical analysis,
+    create a complete scouting report for {matchup}.
+
+  expected_output: >
+    A professional scouting report including:
+
+    - Matchup overview
+    - Key injuries
+    - Team strengths
+    - Team weaknesses
+    - Players to watch
+    - Key matchup battles
+    - Final scouting assessment
+
+    Format as markdown.
+
+  agent: game_scout
