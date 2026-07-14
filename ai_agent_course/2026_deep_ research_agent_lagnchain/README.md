@@ -28,4 +28,4 @@ The agent can answer questions about the 2026 FIFA World Cup, search the web for
 * Compare Brazil and France.
 * Write a short report about Brazil.
 
-This project was built as practice with LangChain agents, tools, middleware, memory, and Gradio.
+This project was built as practice with LangChain agents, tools, middleware, memory, and Gradio.cd 
